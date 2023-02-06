@@ -1515,275 +1515,255 @@ var indexMinimal = {};
 
 var minimal = {};
 
-var aspromise;
-var hasRequiredAspromise;
-function requireAspromise() {
-  if (hasRequiredAspromise) return aspromise;
-  hasRequiredAspromise = 1;
-  aspromise = asPromise;
+var aspromise = asPromise;
 
-  /**
-   * Callback as used by {@link util.asPromise}.
-   * @typedef asPromiseCallback
-   * @type {function}
-   * @param {Error|null} error Error, if any
-   * @param {...*} params Additional arguments
-   * @returns {undefined}
-   */
+/**
+ * Callback as used by {@link util.asPromise}.
+ * @typedef asPromiseCallback
+ * @type {function}
+ * @param {Error|null} error Error, if any
+ * @param {...*} params Additional arguments
+ * @returns {undefined}
+ */
 
-  /**
-   * Returns a promise from a node-style callback function.
-   * @memberof util
-   * @param {asPromiseCallback} fn Function to call
-   * @param {*} ctx Function context
-   * @param {...*} params Function arguments
-   * @returns {Promise<*>} Promisified function
-   */
-  function asPromise(fn, ctx /*, varargs */) {
-    var params = new Array(arguments.length - 1),
-      offset = 0,
-      index = 2,
-      pending = true;
-    while (index < arguments.length) params[offset++] = arguments[index++];
-    return new Promise(function executor(resolve, reject) {
-      params[offset] = function callback(err /*, varargs */) {
-        if (pending) {
-          pending = false;
-          if (err) reject(err);else {
-            var params = new Array(arguments.length - 1),
-              offset = 0;
-            while (offset < params.length) params[offset++] = arguments[offset];
-            resolve.apply(null, params);
-          }
-        }
-      };
-      try {
-        fn.apply(ctx || null, params);
-      } catch (err) {
-        if (pending) {
-          pending = false;
-          reject(err);
+/**
+ * Returns a promise from a node-style callback function.
+ * @memberof util
+ * @param {asPromiseCallback} fn Function to call
+ * @param {*} ctx Function context
+ * @param {...*} params Function arguments
+ * @returns {Promise<*>} Promisified function
+ */
+function asPromise(fn, ctx /*, varargs */) {
+  var params = new Array(arguments.length - 1),
+    offset = 0,
+    index = 2,
+    pending = true;
+  while (index < arguments.length) params[offset++] = arguments[index++];
+  return new Promise(function executor(resolve, reject) {
+    params[offset] = function callback(err /*, varargs */) {
+      if (pending) {
+        pending = false;
+        if (err) reject(err);else {
+          var params = new Array(arguments.length - 1),
+            offset = 0;
+          while (offset < params.length) params[offset++] = arguments[offset];
+          resolve.apply(null, params);
         }
       }
-    });
-  }
-  return aspromise;
+    };
+    try {
+      fn.apply(ctx || null, params);
+    } catch (err) {
+      if (pending) {
+        pending = false;
+        reject(err);
+      }
+    }
+  });
 }
 
 var base64$1 = {};
 
-var hasRequiredBase64;
-function requireBase64() {
-  if (hasRequiredBase64) return base64$1;
-  hasRequiredBase64 = 1;
-  (function (exports) {
-
-    /**
-     * A minimal base64 implementation for number arrays.
-     * @memberof util
-     * @namespace
-     */
-    var base64 = exports;
-
-    /**
-     * Calculates the byte length of a base64 encoded string.
-     * @param {string} string Base64 encoded string
-     * @returns {number} Byte length
-     */
-    base64.length = function length(string) {
-      var p = string.length;
-      if (!p) return 0;
-      var n = 0;
-      while (--p % 4 > 1 && string.charAt(p) === "=") ++n;
-      return Math.ceil(string.length * 3) / 4 - n;
-    };
-
-    // Base64 encoding table
-    var b64 = new Array(64);
-
-    // Base64 decoding table
-    var s64 = new Array(123);
-
-    // 65..90, 97..122, 48..57, 43, 47
-    for (var i = 0; i < 64;) s64[b64[i] = i < 26 ? i + 65 : i < 52 ? i + 71 : i < 62 ? i - 4 : i - 59 | 43] = i++;
-
-    /**
-     * Encodes a buffer to a base64 encoded string.
-     * @param {Uint8Array} buffer Source buffer
-     * @param {number} start Source start
-     * @param {number} end Source end
-     * @returns {string} Base64 encoded string
-     */
-    base64.encode = function encode(buffer, start, end) {
-      var parts = null,
-        chunk = [];
-      var i = 0,
-        // output index
-        j = 0,
-        // goto index
-        t; // temporary
-      while (start < end) {
-        var b = buffer[start++];
-        switch (j) {
-          case 0:
-            chunk[i++] = b64[b >> 2];
-            t = (b & 3) << 4;
-            j = 1;
-            break;
-          case 1:
-            chunk[i++] = b64[t | b >> 4];
-            t = (b & 15) << 2;
-            j = 2;
-            break;
-          case 2:
-            chunk[i++] = b64[t | b >> 6];
-            chunk[i++] = b64[b & 63];
-            j = 0;
-            break;
-        }
-        if (i > 8191) {
-          (parts || (parts = [])).push(String.fromCharCode.apply(String, chunk));
-          i = 0;
-        }
-      }
-      if (j) {
-        chunk[i++] = b64[t];
-        chunk[i++] = 61;
-        if (j === 1) chunk[i++] = 61;
-      }
-      if (parts) {
-        if (i) parts.push(String.fromCharCode.apply(String, chunk.slice(0, i)));
-        return parts.join("");
-      }
-      return String.fromCharCode.apply(String, chunk.slice(0, i));
-    };
-    var invalidEncoding = "invalid encoding";
-
-    /**
-     * Decodes a base64 encoded string to a buffer.
-     * @param {string} string Source string
-     * @param {Uint8Array} buffer Destination buffer
-     * @param {number} offset Destination offset
-     * @returns {number} Number of bytes written
-     * @throws {Error} If encoding is invalid
-     */
-    base64.decode = function decode(string, buffer, offset) {
-      var start = offset;
-      var j = 0,
-        // goto index
-        t; // temporary
-      for (var i = 0; i < string.length;) {
-        var c = string.charCodeAt(i++);
-        if (c === 61 && j > 1) break;
-        if ((c = s64[c]) === undefined) throw Error(invalidEncoding);
-        switch (j) {
-          case 0:
-            t = c;
-            j = 1;
-            break;
-          case 1:
-            buffer[offset++] = t << 2 | (c & 48) >> 4;
-            t = c;
-            j = 2;
-            break;
-          case 2:
-            buffer[offset++] = (t & 15) << 4 | (c & 60) >> 2;
-            t = c;
-            j = 3;
-            break;
-          case 3:
-            buffer[offset++] = (t & 3) << 6 | c;
-            j = 0;
-            break;
-        }
-      }
-      if (j === 1) throw Error(invalidEncoding);
-      return offset - start;
-    };
-
-    /**
-     * Tests if the specified string appears to be base64 encoded.
-     * @param {string} string String to test
-     * @returns {boolean} `true` if probably base64 encoded, otherwise false
-     */
-    base64.test = function test(string) {
-      return /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(string);
-    };
-  })(base64$1);
-  return base64$1;
-}
-
-var eventemitter;
-var hasRequiredEventemitter;
-function requireEventemitter() {
-  if (hasRequiredEventemitter) return eventemitter;
-  hasRequiredEventemitter = 1;
-  eventemitter = EventEmitter;
+(function (exports) {
 
   /**
-   * Constructs a new event emitter instance.
-   * @classdesc A minimal event emitter.
+   * A minimal base64 implementation for number arrays.
    * @memberof util
-   * @constructor
+   * @namespace
    */
-  function EventEmitter() {
-    /**
-     * Registered listeners.
-     * @type {Object.<string,*>}
-     * @private
-     */
-    this._listeners = {};
-  }
+  var base64 = exports;
 
   /**
-   * Registers an event listener.
-   * @param {string} evt Event name
-   * @param {function} fn Listener
-   * @param {*} [ctx] Listener context
-   * @returns {util.EventEmitter} `this`
+   * Calculates the byte length of a base64 encoded string.
+   * @param {string} string Base64 encoded string
+   * @returns {number} Byte length
    */
-  EventEmitter.prototype.on = function on(evt, fn, ctx) {
-    (this._listeners[evt] || (this._listeners[evt] = [])).push({
-      fn: fn,
-      ctx: ctx || this
-    });
-    return this;
+  base64.length = function length(string) {
+    var p = string.length;
+    if (!p) return 0;
+    var n = 0;
+    while (--p % 4 > 1 && string.charAt(p) === "=") ++n;
+    return Math.ceil(string.length * 3) / 4 - n;
   };
 
+  // Base64 encoding table
+  var b64 = new Array(64);
+
+  // Base64 decoding table
+  var s64 = new Array(123);
+
+  // 65..90, 97..122, 48..57, 43, 47
+  for (var i = 0; i < 64;) s64[b64[i] = i < 26 ? i + 65 : i < 52 ? i + 71 : i < 62 ? i - 4 : i - 59 | 43] = i++;
+
   /**
-   * Removes an event listener or any matching listeners if arguments are omitted.
-   * @param {string} [evt] Event name. Removes all listeners if omitted.
-   * @param {function} [fn] Listener to remove. Removes all listeners of `evt` if omitted.
-   * @returns {util.EventEmitter} `this`
+   * Encodes a buffer to a base64 encoded string.
+   * @param {Uint8Array} buffer Source buffer
+   * @param {number} start Source start
+   * @param {number} end Source end
+   * @returns {string} Base64 encoded string
    */
-  EventEmitter.prototype.off = function off(evt, fn) {
-    if (evt === undefined) this._listeners = {};else {
-      if (fn === undefined) this._listeners[evt] = [];else {
-        var listeners = this._listeners[evt];
-        for (var i = 0; i < listeners.length;) if (listeners[i].fn === fn) listeners.splice(i, 1);else ++i;
+  base64.encode = function encode(buffer, start, end) {
+    var parts = null,
+      chunk = [];
+    var i = 0,
+      // output index
+      j = 0,
+      // goto index
+      t; // temporary
+    while (start < end) {
+      var b = buffer[start++];
+      switch (j) {
+        case 0:
+          chunk[i++] = b64[b >> 2];
+          t = (b & 3) << 4;
+          j = 1;
+          break;
+        case 1:
+          chunk[i++] = b64[t | b >> 4];
+          t = (b & 15) << 2;
+          j = 2;
+          break;
+        case 2:
+          chunk[i++] = b64[t | b >> 6];
+          chunk[i++] = b64[b & 63];
+          j = 0;
+          break;
+      }
+      if (i > 8191) {
+        (parts || (parts = [])).push(String.fromCharCode.apply(String, chunk));
+        i = 0;
       }
     }
-    return this;
+    if (j) {
+      chunk[i++] = b64[t];
+      chunk[i++] = 61;
+      if (j === 1) chunk[i++] = 61;
+    }
+    if (parts) {
+      if (i) parts.push(String.fromCharCode.apply(String, chunk.slice(0, i)));
+      return parts.join("");
+    }
+    return String.fromCharCode.apply(String, chunk.slice(0, i));
+  };
+  var invalidEncoding = "invalid encoding";
+
+  /**
+   * Decodes a base64 encoded string to a buffer.
+   * @param {string} string Source string
+   * @param {Uint8Array} buffer Destination buffer
+   * @param {number} offset Destination offset
+   * @returns {number} Number of bytes written
+   * @throws {Error} If encoding is invalid
+   */
+  base64.decode = function decode(string, buffer, offset) {
+    var start = offset;
+    var j = 0,
+      // goto index
+      t; // temporary
+    for (var i = 0; i < string.length;) {
+      var c = string.charCodeAt(i++);
+      if (c === 61 && j > 1) break;
+      if ((c = s64[c]) === undefined) throw Error(invalidEncoding);
+      switch (j) {
+        case 0:
+          t = c;
+          j = 1;
+          break;
+        case 1:
+          buffer[offset++] = t << 2 | (c & 48) >> 4;
+          t = c;
+          j = 2;
+          break;
+        case 2:
+          buffer[offset++] = (t & 15) << 4 | (c & 60) >> 2;
+          t = c;
+          j = 3;
+          break;
+        case 3:
+          buffer[offset++] = (t & 3) << 6 | c;
+          j = 0;
+          break;
+      }
+    }
+    if (j === 1) throw Error(invalidEncoding);
+    return offset - start;
   };
 
   /**
-   * Emits an event by calling its listeners with the specified arguments.
-   * @param {string} evt Event name
-   * @param {...*} args Arguments
-   * @returns {util.EventEmitter} `this`
+   * Tests if the specified string appears to be base64 encoded.
+   * @param {string} string String to test
+   * @returns {boolean} `true` if probably base64 encoded, otherwise false
    */
-  EventEmitter.prototype.emit = function emit(evt) {
-    var listeners = this._listeners[evt];
-    if (listeners) {
-      var args = [],
-        i = 1;
-      for (; i < arguments.length;) args.push(arguments[i++]);
-      for (i = 0; i < listeners.length;) listeners[i].fn.apply(listeners[i++].ctx, args);
-    }
-    return this;
+  base64.test = function test(string) {
+    return /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(string);
   };
-  return eventemitter;
+})(base64$1);
+
+var eventemitter = EventEmitter$1;
+
+/**
+ * Constructs a new event emitter instance.
+ * @classdesc A minimal event emitter.
+ * @memberof util
+ * @constructor
+ */
+function EventEmitter$1() {
+  /**
+   * Registered listeners.
+   * @type {Object.<string,*>}
+   * @private
+   */
+  this._listeners = {};
 }
+
+/**
+ * Registers an event listener.
+ * @param {string} evt Event name
+ * @param {function} fn Listener
+ * @param {*} [ctx] Listener context
+ * @returns {util.EventEmitter} `this`
+ */
+EventEmitter$1.prototype.on = function on(evt, fn, ctx) {
+  (this._listeners[evt] || (this._listeners[evt] = [])).push({
+    fn: fn,
+    ctx: ctx || this
+  });
+  return this;
+};
+
+/**
+ * Removes an event listener or any matching listeners if arguments are omitted.
+ * @param {string} [evt] Event name. Removes all listeners if omitted.
+ * @param {function} [fn] Listener to remove. Removes all listeners of `evt` if omitted.
+ * @returns {util.EventEmitter} `this`
+ */
+EventEmitter$1.prototype.off = function off(evt, fn) {
+  if (evt === undefined) this._listeners = {};else {
+    if (fn === undefined) this._listeners[evt] = [];else {
+      var listeners = this._listeners[evt];
+      for (var i = 0; i < listeners.length;) if (listeners[i].fn === fn) listeners.splice(i, 1);else ++i;
+    }
+  }
+  return this;
+};
+
+/**
+ * Emits an event by calling its listeners with the specified arguments.
+ * @param {string} evt Event name
+ * @param {...*} args Arguments
+ * @returns {util.EventEmitter} `this`
+ */
+EventEmitter$1.prototype.emit = function emit(evt) {
+  var listeners = this._listeners[evt];
+  if (listeners) {
+    var args = [],
+      i = 1;
+    for (; i < arguments.length;) args.push(arguments[i++]);
+    for (i = 0; i < listeners.length;) listeners[i].fn.apply(listeners[i++].ctx, args);
+  }
+  return this;
+};
 
 var float = factory(factory);
 
@@ -2073,27 +2053,20 @@ function readUintBE(buf, pos) {
   return (buf[pos] << 24 | buf[pos + 1] << 16 | buf[pos + 2] << 8 | buf[pos + 3]) >>> 0;
 }
 
-var inquire_1;
-var hasRequiredInquire;
-function requireInquire() {
-  if (hasRequiredInquire) return inquire_1;
-  hasRequiredInquire = 1;
-  inquire_1 = inquire;
+var inquire_1 = inquire;
 
-  /**
-   * Requires a module only if available.
-   * @memberof util
-   * @param {string} moduleName Module to require
-   * @returns {?Object} Required module if available and not empty, otherwise `null`
-   */
-  function inquire(moduleName) {
-    try {
-      var mod = undefined; // eslint-disable-line no-eval
-      if (mod && (mod.length || Object.keys(mod).length)) return mod;
-    } catch (e) {} // eslint-disable-line no-empty
-    return null;
-  }
-  return inquire_1;
+/**
+ * Requires a module only if available.
+ * @memberof util
+ * @param {string} moduleName Module to require
+ * @returns {?Object} Required module if available and not empty, otherwise `null`
+ */
+function inquire(moduleName) {
+  try {
+    var mod = undefined; // eslint-disable-line no-eval
+    if (mod && (mod.length || Object.keys(mod).length)) return mod;
+  } catch (e) {} // eslint-disable-line no-empty
+  return null;
 }
 
 var utf8$2 = {};
@@ -2195,59 +2168,52 @@ var utf8$2 = {};
   };
 })(utf8$2);
 
-var pool_1;
-var hasRequiredPool;
-function requirePool() {
-  if (hasRequiredPool) return pool_1;
-  hasRequiredPool = 1;
-  pool_1 = pool;
+var pool_1 = pool;
 
-  /**
-   * An allocator as used by {@link util.pool}.
-   * @typedef PoolAllocator
-   * @type {function}
-   * @param {number} size Buffer size
-   * @returns {Uint8Array} Buffer
-   */
+/**
+ * An allocator as used by {@link util.pool}.
+ * @typedef PoolAllocator
+ * @type {function}
+ * @param {number} size Buffer size
+ * @returns {Uint8Array} Buffer
+ */
 
-  /**
-   * A slicer as used by {@link util.pool}.
-   * @typedef PoolSlicer
-   * @type {function}
-   * @param {number} start Start offset
-   * @param {number} end End offset
-   * @returns {Uint8Array} Buffer slice
-   * @this {Uint8Array}
-   */
+/**
+ * A slicer as used by {@link util.pool}.
+ * @typedef PoolSlicer
+ * @type {function}
+ * @param {number} start Start offset
+ * @param {number} end End offset
+ * @returns {Uint8Array} Buffer slice
+ * @this {Uint8Array}
+ */
 
-  /**
-   * A general purpose buffer pool.
-   * @memberof util
-   * @function
-   * @param {PoolAllocator} alloc Allocator
-   * @param {PoolSlicer} slice Slicer
-   * @param {number} [size=8192] Slab size
-   * @returns {PoolAllocator} Pooled allocator
-   */
-  function pool(alloc, slice, size) {
-    var SIZE = size || 8192;
-    var MAX = SIZE >>> 1;
-    var slab = null;
-    var offset = SIZE;
-    return function pool_alloc(size) {
-      if (size < 1 || size > MAX) return alloc(size);
-      if (offset + size > SIZE) {
-        slab = alloc(SIZE);
-        offset = 0;
-      }
-      var buf = slice.call(slab, offset, offset += size);
-      if (offset & 7)
-        // align to 32 bit
-        offset = (offset | 7) + 1;
-      return buf;
-    };
-  }
-  return pool_1;
+/**
+ * A general purpose buffer pool.
+ * @memberof util
+ * @function
+ * @param {PoolAllocator} alloc Allocator
+ * @param {PoolSlicer} slice Slicer
+ * @param {number} [size=8192] Slab size
+ * @returns {PoolAllocator} Pooled allocator
+ */
+function pool(alloc, slice, size) {
+  var SIZE = size || 8192;
+  var MAX = SIZE >>> 1;
+  var slab = null;
+  var offset = SIZE;
+  return function pool_alloc(size) {
+    if (size < 1 || size > MAX) return alloc(size);
+    if (offset + size > SIZE) {
+      slab = alloc(SIZE);
+      offset = 0;
+    }
+    var buf = slice.call(slab, offset, offset += size);
+    if (offset & 7)
+      // align to 32 bit
+      offset = (offset | 7) + 1;
+    return buf;
+  };
 }
 
 var longbits;
@@ -2434,25 +2400,25 @@ function requireMinimal() {
     var util = exports;
 
     // used to return a Promise where callback is omitted
-    util.asPromise = requireAspromise();
+    util.asPromise = aspromise;
 
     // converts to / from base64 encoded strings
-    util.base64 = requireBase64();
+    util.base64 = base64$1;
 
     // base class of rpc.Service
-    util.EventEmitter = requireEventemitter();
+    util.EventEmitter = eventemitter;
 
     // float handling accross browsers
     util.float = float;
 
     // requires modules optionally and hides the call from bundlers
-    util.inquire = requireInquire();
+    util.inquire = inquire_1;
 
     // converts to / from utf8 encoded strings
     util.utf8 = utf8$2;
 
     // provides a node-like buffer pool in the browser
-    util.pool = requirePool();
+    util.pool = pool_1;
 
     // utility to work with the low and high bits of a 64 bit value
     util.LongBits = requireLongbits();
